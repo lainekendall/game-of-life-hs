@@ -3,74 +3,70 @@ module Main where
 main :: IO ()
 main = do print "Hi"
 
-type Grid = [[Bool]]
-type SmartGrid = [[(Int,Int,Bool)]]
+type Grid = [[Cell]]
+type SmartGrid = [[SmartCell]]
 type Cell = Bool
 type SmartCell = (Int,Int,Cell)
 type Coordinate = (Int,Int)
 
--- Turn grid from state 1 to state 2, applying rules to each cell
+height :: [[a]] -> Int
+height g = length (g !! 0)
+
+lookupCoord :: SmartGrid -> Coordinate -> Bool
+lookupCoord smartGrid (x,y) = let 
+  (_,_,alive) = (smartGrid !! x) !! y 
+    in checkOutOfBounds smartGrid (x,y) && alive
+
+-- Return False if coordinate is out of bounds for the grid
+checkOutOfBounds :: [a] -> Coordinate -> Bool 
+checkOutOfBounds grid (x,y) = elem x valid && elem y valid where
+  valid = [0,length grid - 1]
+
+-- Turn Grid from state 1 to state 2, applying rules to each cell
 evolve :: Grid -> Grid
 evolve grid = let 
-    gridWithCoords = smartedGrid grid
-    computeFunc = computeNewValue gridWithCoords
-    evolvedGrid = map (map computeFunc) gridWithCoords
-      in evolvedGrid
+    smartGrid = smartenGrid grid
+    computeFunc = computeNewValue smartGrid
+    in map (map computeFunc) smartGrid
 
 -- Turn a Grid into a SmartGrid
-smartedGrid :: Grid -> SmartGrid
-smartedGrid grid = [get2DCoords rowHeight (grid !! rowHeight) | rowHeight <- [0..height (Left grid) - 1]]
+smartenGrid :: Grid -> SmartGrid
+smartenGrid grid = [smartenRow rowHeight (grid !! rowHeight) | rowHeight <- [0..height grid - 1]]
 
--- Given a rowHeight, turn a list of cells into SmartCells
-get2DCoords :: Int -> [Cell] -> [SmartCell] -- enhancement: add Cell here
-get2DCoords rowHeight row = [(x,rowHeight,b) | x <- [0..length row - 1], b <- [row !! x]]
-
--- Get height of a 2D array, assumes 2D array is square
-height :: Either Grid SmartGrid -> Int
-height (Left grid) = length (grid !! 0)
-height (Right smartGrid) = length (smartGrid !! 0)
-
-extractCell :: Either Cell SmartCell -> Cell
-extractCell (Left c) = c;
-extractCell (Right (_,_,c)) = c;
-
-lookupCell :: Either Grid SmartGrid -> Coordinate -> Cell
-lookupCell grid (x,y)
-    | x < 0 || y < 0 || x >= (length grid) || y >= (height grid) = False
-    | otherwise = extractCell (grid !! x) !! y
-
-lookupSmartCell :: SmartGrid -> Coordinate -> Cell
-lookupSmartCell grid (x,y)
-    | x < 0 || y < 0 || x >= (length grid) || y >= (height grid) = False
-    | otherwise = let (_,_,bool) = (grid !! x) !! y in bool
+-- Given a rowHeight, turn a list of Cells into SmartCells
+smartenRow :: Int -> [Cell] -> [SmartCell]
+smartenRow rowHeight row = [(x,rowHeight,b) | x <- [0..length row - 1], b <- [row !! x]]
 
 -- Given a SmartGrid, apply game of life rules to a SmartCell and transform it into a Cell
 computeNewValue :: SmartGrid -> SmartCell -> Cell
 computeNewValue smartGrid coord = applyRule aliveNeighbors alive where
     coord2 = threeToTwo coord
     aliveNeighbors = countAliveNeighbors smartGrid coord2
-    alive = lookupSmartCell smartGrid coord2
+    alive = lookupCoord smartGrid coord2
 
+-- Drop third element of a 3-tuple
 threeToTwo :: (a,b,c) -> (a,b)
 threeToTwo (a,b,_) = (a,b)
 
+-- Given a SmartGrid and a Coordinate, count how many alive neighbors that cell has
 countAliveNeighbors :: SmartGrid -> Coordinate -> Int
 countAliveNeighbors grid coord = countAliveFromCoords grid (getNeighborCoords coord)
 
-countAliveFromCoords :: SmartGrid -> [Coordinate] -> Int
-countAliveFromCoords grid coords = foldl (countCellsAtCoords grid) 0 coords
-
-countCellsAtCoords :: SmartGrid -> Int -> (Int, Int) -> Int
-countCellsAtCoords grid soFar next = let boolAtCoord = lookupSmartCell grid next
-    in soFar + boolToInt boolAtCoord
-
-boolToInt :: Cell -> Int
-boolToInt True = 1
-boolToInt False = 0
-
+-- Given a coordinate, get all 8 neighbors coordinates
 getNeighborCoords :: Coordinate -> [Coordinate]
-getNeighborCoords (x,y) = [(x1,y1) | x1 <- [x+1,x,x-1], y1 <- [y+1,y,y-1], (x1,y1) /= (x,y)]
+getNeighborCoords (x,y) = [(x1,y1) | x1 <- [x+1..x-1], y1 <- [y+1..y-1], (x1,y1) /= (x,y)]
 
+-- Given a SmartGrid and a list of Coordinates, count how many of the list are alive
+countAliveFromCoords :: SmartGrid -> [Coordinate] -> Int
+countAliveFromCoords grid coords = foldl (foldCells grid) 0 coords
+
+-- Fold function for summing up Cells aliveness
+foldCells :: SmartGrid -> Int -> Coordinate -> Int
+foldCells smartGrid soFar next = let 
+    boolAtCoord = lookupCoord smartGrid next
+      in soFar + fromEnum boolAtCoord
+
+-- Apply Conway Game of Life Rules to a Cell, given number of alive neighbors and the cells state
 applyRule :: Int -> Cell -> Cell
 applyRule aliveNeighbors alive =
     case aliveNeighbors of
