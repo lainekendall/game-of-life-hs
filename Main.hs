@@ -9,19 +9,6 @@ type Cell = Bool
 type SmartCell = (Int,Int,Cell)
 type Coordinate = (Int,Int)
 
-height :: [[a]] -> Int
-height g = length (g !! 0)
-
-lookupCoord :: SmartGrid -> Coordinate -> Bool
-lookupCoord smartGrid (x,y) = let 
-  (_,_,alive) = (smartGrid !! x) !! y 
-    in checkOutOfBounds smartGrid (x,y) && alive
-
--- Return False if coordinate is out of bounds for the grid
-checkOutOfBounds :: [a] -> Coordinate -> Bool 
-checkOutOfBounds grid (x,y) = elem x valid && elem y valid where
-  valid = [0,length grid - 1]
-
 -- Turn Grid from state 1 to state 2, applying rules to each cell
 evolve :: Grid -> Grid
 evolve grid = let 
@@ -54,7 +41,7 @@ countAliveNeighbors grid coord = countAliveFromCoords grid (getNeighborCoords co
 
 -- Given a coordinate, get all 8 neighbors coordinates
 getNeighborCoords :: Coordinate -> [Coordinate]
-getNeighborCoords (x,y) = [(x1,y1) | x1 <- [x+1..x-1], y1 <- [y+1..y-1], (x1,y1) /= (x,y)]
+getNeighborCoords (x,y) = [(x1,y1) | x1 <- [x-1..x+1], y1 <- [y-1..y+1], (x1,y1) /= (x,y)]
 
 -- Given a SmartGrid and a list of Coordinates, count how many of the list are alive
 countAliveFromCoords :: SmartGrid -> [Coordinate] -> Int
@@ -74,3 +61,19 @@ applyRule aliveNeighbors alive =
       3 -> True
       4 -> alive
       _ -> False
+
+-- Grid utility functions
+height :: [[a]] -> Int
+height g = length (g !! 0)
+
+lookupCoord :: SmartGrid -> Coordinate -> Bool
+lookupCoord smartGrid (x,y) = let 
+  (_,_,alive) = (smartGrid !! x) !! y 
+    in checkOutOfBounds smartGrid (x,y) && alive
+
+-- Return False if coordinate is out of bounds for the grid
+checkOutOfBounds :: [a] -> Coordinate -> Bool 
+checkOutOfBounds grid (x,y) = elem x valid && elem y valid where
+  valid = [0,length grid - 1]
+
+
